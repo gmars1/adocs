@@ -311,10 +311,13 @@ fn compute_folder_status(
     for (folder_path, record) in &prev_folders.folders {
         if !folders.contains_key(folder_path.as_str()) {
             let purpose_abs = map_root.join(&record.purpose_path);
+            if !purpose_abs.exists() {
+                continue;
+            }
             statuses.push(FolderStatusJson {
                 path: folder_path.to_string(),
                 state: "stale".to_string(),
-                purpose_doc_exists: purpose_abs.exists(),
+                purpose_doc_exists: true,
             });
         }
     }

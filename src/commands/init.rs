@@ -1,5 +1,5 @@
 use camino::Utf8PathBuf;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::fs::{agenignore, discover};
 use crate::model::{FileRecord, FileId, FilesLedger, FoldersLedger, ResolvedRoots};
@@ -214,6 +214,30 @@ pub fn run_sync(request: &crate::SyncRequest) -> Result<SyncReport, crate::error
 
         ledger.files.insert(file_id.clone(), record);
         ledger.observed_path_index.insert(obs.source_path.clone(), file_id);
+    }
+
+    {
+        let active_folders: BTreeSet<Utf8PathBuf> = observed
+            .iter()
+            .filter_map(|obs| obs.source_path.parent().map(|p| p.to_owned()))
+            .collect();
+
+        let orphaned: Vec<Utf8PathBuf> = prev_folders
+            .folders
+            .keys()
+            .filter(|k| !active_folders.contains(*k))
+            .cloned()
+            .collect();
+
+        for folder_path in &orphaned {
+            if let Some(record) = prev_folders.folders.remove(folder_path) {
+                let purpose_abs = request.roots.map_root.join(&record.purpose_path);
+                if purpose_abs.exists() {
+                    std::fs::remove_file(&purpose_abs)?;
+                    docs_deleted += 1;
+                }
+            }
+        }
     }
 
     ledger.save(&files_ledger_path)?;
