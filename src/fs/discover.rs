@@ -4,6 +4,7 @@ use std::collections::BTreeSet;
 use ignore::{DirEntry, WalkBuilder};
 
 use super::agenignore;
+use super::agentwatch;
 use super::hash;
 
 #[derive(Debug, Clone)]
@@ -21,6 +22,7 @@ pub fn discover_source_files(
     respect_gitignore: bool,
 ) -> Result<Vec<ObservedFile>, crate::error::AdocsError> {
     let matcher = agenignore::build_ignore_matcher(map_root)?;
+    let watch = agentwatch::build_watch_matcher(map_root)?;
 
     let source_abs = source_root
         .as_std_path()
@@ -41,6 +43,24 @@ pub fn discover_source_files(
             let is_dir = entry.file_type().map_or(false, |ft: std::fs::FileType| ft.is_dir());
             let matched = m.matched(entry.path(), is_dir);
             if matched.is_ignore() {
+                return false;
+            }
+            if let Some(ref w) = watch {
+                if w.matched(entry.path(), is_dir).is_ignore() {
+                    return false;
+                }
+            }
+            if let Some(name) = entry.path().file_name().and_then(|n: &std::ffi::OsStr| n.to_str()) {
+                if name == ".adocs" || name == ".git" {
+                    return false;
+                }
+            }
+            true
+        });
+    } else if let Some(w) = watch {
+        builder.filter_entry(move |entry: &DirEntry| -> bool {
+            let is_dir = entry.file_type().map_or(false, |ft: std::fs::FileType| ft.is_dir());
+            if w.matched(entry.path(), is_dir).is_ignore() {
                 return false;
             }
             if let Some(name) = entry.path().file_name().and_then(|n: &std::ffi::OsStr| n.to_str()) {
