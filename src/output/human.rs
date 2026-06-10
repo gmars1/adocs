@@ -1,92 +1,130 @@
-use camino::Utf8PathBuf;
 use crate::fs::hash;
 use crate::model::{file_state, folder_purpose_state, FilesLedger, FoldersLedger, ResolvedRoots};
 use crate::{
     ChangedReport, DocsUnderReport, ListStateReport, SealReport, StatusReport, SyncReport,
     UpdateDocReport,
 };
+use camino::Utf8PathBuf;
 
 fn use_color() -> bool {
     std::io::IsTerminal::is_terminal(&std::io::stdout())
 }
 
-fn green(s: &str) -> String  { if use_color() { format!("\u{001b}[32m{}\u{001b}[0m", s) } else { s.to_string() } }
-fn yellow(s: &str) -> String { if use_color() { format!("\u{001b}[33m{}\u{001b}[0m", s) } else { s.to_string() } }
-fn cyan(s: &str) -> String   { if use_color() { format!("\u{001b}[36m{}\u{001b}[0m", s) } else { s.to_string() } }
-fn red(s: &str) -> String    { if use_color() { format!("\u{001b}[31m{}\u{001b}[0m", s) } else { s.to_string() } }
+fn green(s: &str) -> String {
+    if use_color() {
+        format!("\u{001b}[32m{}\u{001b}[0m", s)
+    } else {
+        s.to_string()
+    }
+}
+fn yellow(s: &str) -> String {
+    if use_color() {
+        format!("\u{001b}[33m{}\u{001b}[0m", s)
+    } else {
+        s.to_string()
+    }
+}
+fn cyan(s: &str) -> String {
+    if use_color() {
+        format!("\u{001b}[36m{}\u{001b}[0m", s)
+    } else {
+        s.to_string()
+    }
+}
+fn red(s: &str) -> String {
+    if use_color() {
+        format!("\u{001b}[31m{}\u{001b}[0m", s)
+    } else {
+        s.to_string()
+    }
+}
 
 pub fn print_status(report: &StatusReport) {
     let stale_files: Vec<_> = report.files.iter().filter(|f| f.state == "stale").collect();
-    let valid_files: Vec<_> = report.files.iter().filter(|f| f.state == "valid").collect();
-    let sealed_files: Vec<_> = report.files.iter().filter(|f| f.state == "sealed").collect();
+    let current_files = report
+        .files
+        .iter()
+        .filter(|f| f.state == "valid" || f.state == "sealed")
+        .count();
+    let folder_docs_to_update: Vec<_> = report
+        .folders
+        .iter()
+        .filter(|f| f.state == "stale" && f.purpose_doc_exists)
+        .collect();
+    let missing_purpose: Vec<_> = report
+        .folders
+        .iter()
+        .filter(|f| !f.purpose_doc_exists)
+        .collect();
+    let current_folders = report
+        .folders
+        .iter()
+        .filter(|f| f.state == "valid" || f.state == "sealed")
+        .count();
 
     if !report.changed.is_empty() {
-        println!("  Changes");
+        println!("  Source changes ({})", report.changed.len());
         for entry in &report.changed {
             let icon = match entry.change.as_str() {
-                "added"    => green("+"),
+                "added" => green("+"),
                 "modified" => yellow("~"),
-                "deleted"  => red("-"),
-                "moved"    => cyan("\u{2192}"),
-                "renamed"  => cyan("\u{21c4}"),
-                _          => "?".to_string(),
+                "deleted" => red("-"),
+                "moved" => cyan("\u{2192}"),
+                "renamed" => cyan("\u{21c4}"),
+                _ => "?".to_string(),
             };
             match entry.from.as_ref() {
-                Some(from) => println!("  {} {:8}  {} \u{2192} {}", icon, entry.change, from, entry.path),
-                None       => println!("  {} {:8}  {}", icon, entry.change, entry.path),
+                Some(from) => println!(
+                    "  {} {:8}  {} \u{2192} {}",
+                    icon, entry.change, from, entry.path
+                ),
+                None => println!("  {} {:8}  {}", icon, entry.change, entry.path),
             }
         }
         println!();
     }
 
-    if !report.files.is_empty() {
-        let mut parts = Vec::new();
-        if !stale_files.is_empty()  { parts.push(yellow(&format!("{} stale", stale_files.len()))); }
-        if !valid_files.is_empty()  { parts.push(green(&format!("{} valid", valid_files.len()))); }
-        if !sealed_files.is_empty() { parts.push(cyan(&format!("{} sealed", sealed_files.len()))); }
-        println!("  Files ({})", parts.join(" \u{00b7} "));
-        for file in &report.files {
-            let state_str = format!("{:6}", file.state);
-            let colored = match file.state.as_str() {
-                "stale"  => yellow(&state_str),
-                "valid"  => green(&state_str),
-                "sealed" => cyan(&state_str),
-                _        => state_str,
-            };
-            println!("  {}  {}", colored, file.path);
-        }
-        println!();
-    }
-
-    if !report.folders.is_empty() {
-        println!("  Folders ({} tracked)", report.folders.len());
-        for folder in &report.folders {
-            let state_str = format!("{:6}", folder.state);
-            let colored = match folder.state.as_str() {
-                "stale"  => yellow(&state_str),
-                "valid"  => green(&state_str),
-                "sealed" => cyan(&state_str),
-                _        => state_str,
-            };
-            let marker = if !folder.purpose_doc_exists { " (!)" } else { "" };
-            println!("  {}  {}/{}", colored, folder.path, marker);
-        }
-        println!();
-    }
-
     if !stale_files.is_empty() {
-        println!("  {} ({} need update)", yellow("Stale docs"), stale_files.len());
+        println!(
+            "  {} ({})",
+            yellow("File docs to update"),
+            stale_files.len()
+        );
         for file in &stale_files {
-            println!("  {}", crate::model::paths::file_description_path(&file.path));
+            println!(
+                "  {}",
+                crate::model::paths::file_description_path(&file.path)
+            );
         }
         println!();
     }
 
-    let missing_purpose: Vec<_> = report.folders.iter().filter(|f| !f.purpose_doc_exists).collect();
+    if !folder_docs_to_update.is_empty() {
+        println!(
+            "  {} ({})",
+            yellow("Folder docs to update"),
+            folder_docs_to_update.len()
+        );
+        for folder in &folder_docs_to_update {
+            println!(
+                "  {}",
+                crate::model::paths::folder_purpose_path(&folder.path)
+            );
+        }
+        println!();
+    }
+
     if !missing_purpose.is_empty() {
-        println!("  {} ({} need template)", yellow("Missing docs"), missing_purpose.len());
+        println!(
+            "  {} ({})",
+            yellow("Folder docs to create"),
+            missing_purpose.len()
+        );
         for folder in &missing_purpose {
-            println!("  {}", crate::model::paths::folder_purpose_path(&folder.path));
+            println!(
+                "  {}",
+                crate::model::paths::folder_purpose_path(&folder.path)
+            );
         }
         println!();
     }
@@ -100,12 +138,25 @@ pub fn print_status(report: &StatusReport) {
     }
 
     let mut parts = Vec::new();
-    parts.push(format!("{} files", report.files.len()));
-    parts.push(format!("{} folders", report.folders.len()));
-    if report.changed.len() > 0 { parts.push(format!("{} changed", report.changed.len())); }
-    if report.ambiguous.len() > 0 { parts.push(format!("{} ambiguous", report.ambiguous.len())); }
-    if !stale_files.is_empty() { parts.push(yellow(&format!("{} stale", stale_files.len()))); }
-    if !missing_purpose.is_empty() { parts.push(yellow(&format!("{} missing", missing_purpose.len()))); }
+    parts.push(format!(
+        "{} files ({} current, {} need update)",
+        report.files.len(),
+        current_files,
+        stale_files.len(),
+    ));
+    parts.push(format!(
+        "{} folders ({} current, {} need update, {} missing)",
+        report.folders.len(),
+        current_folders,
+        folder_docs_to_update.len(),
+        missing_purpose.len(),
+    ));
+    if !report.changed.is_empty() {
+        parts.push(format!("{} source changes", report.changed.len()));
+    }
+    if !report.ambiguous.is_empty() {
+        parts.push(format!("{} ambiguous", report.ambiguous.len()));
+    }
 
     println!("  \u{2500}\u{2500}  {}", parts.join("  \u{00b7}  "));
 }
@@ -117,16 +168,19 @@ pub fn print_changed(report: &ChangedReport) {
     }
     for entry in &report.changed {
         let icon = match entry.change.as_str() {
-            "added"    => "+",
+            "added" => "+",
             "modified" => "~",
-            "deleted"  => "-",
-            "moved"    => "\u{2192}",
-            "renamed"  => "\u{21c4}",
-            _          => "?",
+            "deleted" => "-",
+            "moved" => "\u{2192}",
+            "renamed" => "\u{21c4}",
+            _ => "?",
         };
         match entry.from.as_ref() {
-            Some(from) => println!("{} {:8}  {} \u{2192} {}", icon, entry.change, from, entry.path),
-            None       => println!("{} {:8}  {}", icon, entry.change, entry.path),
+            Some(from) => println!(
+                "{} {:8}  {} \u{2192} {}",
+                icon, entry.change, from, entry.path
+            ),
+            None => println!("{} {:8}  {}", icon, entry.change, entry.path),
         }
     }
 }
@@ -139,7 +193,10 @@ pub fn print_list(report: &ListStateReport) {
     if !report.files.is_empty() {
         println!("  {} files:", report.state);
         for file in &report.files {
-            println!("  {}", crate::model::paths::file_description_path(&file.path));
+            println!(
+                "  {}",
+                crate::model::paths::file_description_path(&file.path)
+            );
         }
     }
     if !report.folders.is_empty() {
@@ -148,7 +205,10 @@ pub fn print_list(report: &ListStateReport) {
         }
         println!("  {} folders:", report.state);
         for folder in &report.folders {
-            println!("  {}", crate::model::paths::folder_purpose_path(&folder.path));
+            println!(
+                "  {}",
+                crate::model::paths::folder_purpose_path(&folder.path)
+            );
         }
     }
 }
@@ -161,7 +221,10 @@ pub fn print_list_valid(report: &ListStateReport) {
     print_list(report);
 }
 
-pub fn print_context(path: &camino::Utf8PathBuf, roots: &ResolvedRoots) -> Result<(), crate::AdocsError> {
+pub fn print_context(
+    path: &camino::Utf8PathBuf,
+    roots: &ResolvedRoots,
+) -> Result<(), crate::AdocsError> {
     let desc_path = crate::model::paths::file_description_path(path.as_str());
     let desc_abs = roots.map_root.join(&desc_path);
 
@@ -172,16 +235,19 @@ pub fn print_context(path: &camino::Utf8PathBuf, roots: &ResolvedRoots) -> Resul
 
     match std::fs::read_to_string(desc_abs.as_std_path()) {
         Ok(content) => {
-            let state = FilesLedger::load(&hashes_dir.join("files.json")).ok().and_then(|ledger| {
-                ledger.observed_path_index.get(path).and_then(|fid| {
-                    ledger.files.get(fid).map(|rec| {
-                        let source_abs = roots.source_root.join(path);
-                        let ch = hash::hash_file(source_abs.as_std_path()).unwrap_or_default();
-                        let de = roots.map_root.join(&rec.description_path).exists();
-                        file_state(&ch, rec.doc.as_ref(), rec.seal.as_ref(), de)
+            let state = FilesLedger::load(&hashes_dir.join("files.json"))
+                .ok()
+                .and_then(|ledger| {
+                    ledger.observed_path_index.get(path).and_then(|fid| {
+                        ledger.files.get(fid).map(|rec| {
+                            let source_abs = roots.source_root.join(path);
+                            let ch = hash::hash_file(source_abs.as_std_path()).unwrap_or_default();
+                            let de = roots.map_root.join(&rec.description_path).exists();
+                            file_state(&ch, rec.doc.as_ref(), rec.seal.as_ref(), de)
+                        })
                     })
                 })
-            }).unwrap_or(crate::model::TrustState::Stale);
+                .unwrap_or(crate::model::TrustState::Stale);
             println!("file description ({}):", desc_path);
             println!("trust state: {}", state);
             println!("{}", content);
@@ -195,17 +261,23 @@ pub fn print_context(path: &camino::Utf8PathBuf, roots: &ResolvedRoots) -> Resul
         let purp_path = crate::model::paths::folder_purpose_path(parent.as_str());
         let purp_abs = roots.map_root.join(&purp_path);
         if let Ok(content) = std::fs::read_to_string(purp_abs.as_std_path()) {
-            let state = FoldersLedger::load(&hashes_dir.join("docs.json")).ok().and_then(|ledger| {
-                ledger.folders.get(&Utf8PathBuf::from(parent.as_str())).map(|rec| {
-                    let purpose_hash = hash::hash_file(purp_abs.as_std_path()).ok();
-                    folder_purpose_state(
-                        true,
-                        rec.doc.as_ref(),
-                        purpose_hash.as_deref(),
-                        rec.seal.as_ref(),
-                    )
+            let state = FoldersLedger::load(&hashes_dir.join("docs.json"))
+                .ok()
+                .and_then(|ledger| {
+                    ledger
+                        .folders
+                        .get(&Utf8PathBuf::from(parent.as_str()))
+                        .map(|rec| {
+                            let purpose_hash = hash::hash_file(purp_abs.as_std_path()).ok();
+                            folder_purpose_state(
+                                true,
+                                rec.doc.as_ref(),
+                                purpose_hash.as_deref(),
+                                rec.seal.as_ref(),
+                            )
+                        })
                 })
-            }).unwrap_or(crate::model::TrustState::Stale);
+                .unwrap_or(crate::model::TrustState::Stale);
             println!("folder purpose ({}):", purp_path);
             println!("trust state: {}", state);
             println!("{}", content);
@@ -216,19 +288,35 @@ pub fn print_context(path: &camino::Utf8PathBuf, roots: &ResolvedRoots) -> Resul
 }
 
 pub fn print_update(report: &UpdateDocReport) {
-    println!("  {} \u{2192} {}", report.path, green(&report.state.to_string()));
+    println!(
+        "  {} \u{2192} {}",
+        report.path,
+        green(&report.state.to_string())
+    );
 }
 
 pub fn print_seal(report: &SealReport) {
-    println!("  {} \u{2192} {}", report.path, cyan(&report.state.to_string()));
+    println!(
+        "  {} \u{2192} {}",
+        report.path,
+        cyan(&report.state.to_string())
+    );
 }
 
 pub fn print_sync(report: &SyncReport) {
     let mut parts = Vec::new();
-    if report.templates_created > 0 { parts.push(green(&format!("+{} created", report.templates_created))); }
-    if report.docs_moved > 0      { parts.push(cyan(&format!("\u{2192}{} moved", report.docs_moved))); }
-    if report.docs_deleted > 0    { parts.push(red(&format!("-{} deleted", report.docs_deleted))); }
-    if report.ambiguous_skipped > 0 { parts.push(format!("{} skipped (ambiguous)", report.ambiguous_skipped)); }
+    if report.templates_created > 0 {
+        parts.push(green(&format!("+{} created", report.templates_created)));
+    }
+    if report.docs_moved > 0 {
+        parts.push(cyan(&format!("\u{2192}{} moved", report.docs_moved)));
+    }
+    if report.docs_deleted > 0 {
+        parts.push(red(&format!("-{} deleted", report.docs_deleted)));
+    }
+    if report.ambiguous_skipped > 0 {
+        parts.push(format!("{} skipped (ambiguous)", report.ambiguous_skipped));
+    }
     if parts.is_empty() {
         println!("  (up to date)");
     } else {
@@ -248,7 +336,11 @@ pub fn print_docs_under(report: &DocsUnderReport) {
     if !folders.is_empty() {
         println!("folder purposes:");
         for entry in &folders {
-            println!("  {} ({})", entry.path, entry.trust_state.as_deref().unwrap_or("stale"));
+            println!(
+                "  {} ({})",
+                entry.path,
+                entry.trust_state.as_deref().unwrap_or("stale")
+            );
         }
     }
 
@@ -258,7 +350,11 @@ pub fn print_docs_under(report: &DocsUnderReport) {
         }
         println!("file descriptions:");
         for entry in &files {
-            println!("  {} ({})", entry.path, entry.trust_state.as_deref().unwrap_or("stale"));
+            println!(
+                "  {} ({})",
+                entry.path,
+                entry.trust_state.as_deref().unwrap_or("stale")
+            );
         }
     }
 }
