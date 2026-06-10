@@ -1,5 +1,5 @@
 use camino::Utf8PathBuf;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::fs::{agenignore, discover};
 use crate::model::{FileRecord, FileId, FilesLedger, FoldersLedger, ResolvedRoots};
@@ -97,6 +97,9 @@ pub fn run_sync(request: &crate::SyncRequest) -> Result<SyncReport, crate::error
             if desc_abs.exists() {
                 std::fs::remove_file(&desc_abs)?;
                 docs_deleted += 1;
+            }
+            if let Some(file_id) = ledger.observed_path_index.remove(prev_path) {
+                ledger.files.remove(&file_id);
             }
         } else if candidates.len() == 1 {
             let new_path = &candidates[0].source_path;
@@ -211,6 +214,54 @@ pub fn run_sync(request: &crate::SyncRequest) -> Result<SyncReport, crate::error
 
         ledger.files.insert(file_id.clone(), record);
         ledger.observed_path_index.insert(obs.source_path.clone(), file_id);
+    }
+
+    {
+        let active_folders: BTreeSet<Utf8PathBuf> = observed
+            .iter()
+            .filter_map(|obs| obs.source_path.parent().map(|p| p.to_owned()))
+            .collect();
+
+        for folder_path in &active_folders {
+            let purpose_path = crate::model::paths::folder_purpose_path(folder_path.as_str());
+            let purpose_abs = request.roots.map_root.join(&purpose_path);
+            if !purpose_abs.exists() {
+                if let Some(parent) = purpose_abs.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                std::fs::write(
+                    &purpose_abs,
+                    format!("# {}\n\nTODO: describe why this folder exists\n", folder_path),
+                )?;
+                templates_created += 1;
+
+                prev_folders.folders.entry(folder_path.clone()).or_insert_with(|| {
+                    crate::model::FolderRecord {
+                        purpose_path: purpose_path.clone(),
+                        doc_sha256: None,
+                        doc: None,
+                        seal: None,
+                    }
+                });
+            }
+        }
+
+        let orphaned: Vec<Utf8PathBuf> = prev_folders
+            .folders
+            .keys()
+            .filter(|k| !active_folders.contains(*k))
+            .cloned()
+            .collect();
+
+        for folder_path in &orphaned {
+            if let Some(record) = prev_folders.folders.remove(folder_path) {
+                let purpose_abs = request.roots.map_root.join(&record.purpose_path);
+                if purpose_abs.exists() {
+                    std::fs::remove_file(&purpose_abs)?;
+                    docs_deleted += 1;
+                }
+            }
+        }
     }
 
     ledger.save(&files_ledger_path)?;
