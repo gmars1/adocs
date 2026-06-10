@@ -1,7 +1,7 @@
 use camino::Utf8PathBuf;
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::fs::{agenignore, discover};
+use crate::fs::{agenignore, agentwatch, discover};
 use crate::model::{FileRecord, FileId, FilesLedger, FoldersLedger, ResolvedRoots};
 use crate::SyncReport;
 
@@ -19,6 +19,7 @@ pub fn run_init(roots: &ResolvedRoots, force: bool) -> Result<(), crate::error::
     std::fs::create_dir_all(&hashes)?;
     std::fs::create_dir_all(&agents)?;
     agenignore::write_default_agenignore(&roots.map_root)?;
+    agentwatch::write_default_agentwatch(&roots.map_root)?;
 
     let files_ledger = crate::model::ledger::FilesLedger::new(
         roots.source_root.clone(),
