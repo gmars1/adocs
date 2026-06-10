@@ -31,6 +31,16 @@ impl TestProject {
         cmd
     }
 
+    fn adocs_from_parent(&self) -> Command {
+        let mut cmd = Command::cargo_bin("adocs").unwrap();
+        let parent = self.dir.path().parent().unwrap();
+        let relative_project = self.dir.path().file_name().unwrap();
+        cmd.current_dir(parent);
+        cmd.arg("--source-root").arg(relative_project);
+        cmd.arg("--map-root").arg(relative_project);
+        cmd
+    }
+
     fn path(&self) -> &Path {
         self.dir.path()
     }
@@ -91,6 +101,77 @@ fn test_agentwatch_tracks_directory_contents() {
         .assert()
         .success()
         .stdout(predicate::str::contains(".adocs/agents/tests/smoke.rs.md"))
+        .stdout(predicate::str::contains(".adocs/agents/src/main.rs.md").not());
+}
+
+#[test]
+fn test_agentwatch_root_glob_tracks_root_files_only() {
+    let p = TestProject::new();
+    fs::write(p.path().join("root.py"), "print('root')\n").unwrap();
+    fs::create_dir_all(p.path().join("pkg").join("deep")).unwrap();
+    fs::write(
+        p.path().join("pkg").join("deep").join("worker.py"),
+        "print('ok')\n",
+    )
+    .unwrap();
+    fs::write(
+        p.path().join("pkg").join("deep").join("notes.txt"),
+        "ignore me\n",
+    )
+    .unwrap();
+
+    p.adocs().arg("init").assert().success();
+    fs::write(p.path().join(".adocs").join(".agentwatch"), "*.py\n").unwrap();
+
+    p.adocs().arg("sync").assert().success();
+    p.adocs()
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(".adocs/agents/root.py.md"))
+        .stdout(predicate::str::contains(".adocs/agents/pkg/deep/worker.py.md").not())
+        .stdout(predicate::str::contains("notes.txt").not())
+        .stdout(predicate::str::contains(".adocs/agents/src/main.rs.md").not());
+}
+
+#[test]
+fn test_agentwatch_globstar_tracks_tree_files() {
+    let p = TestProject::new();
+    fs::write(p.path().join("src").join("app.py"), "print('src')\n").unwrap();
+    fs::create_dir_all(p.path().join("src").join("pkg")).unwrap();
+    fs::write(
+        p.path().join("src").join("pkg").join("worker.py"),
+        "print('deep src')\n",
+    )
+    .unwrap();
+    fs::create_dir_all(p.path().join("tests").join("unit")).unwrap();
+    fs::write(
+        p.path().join("tests").join("unit").join("test_app.py"),
+        "def test_app(): pass\n",
+    )
+    .unwrap();
+    fs::write(p.path().join("tests").join("notes.txt"), "ignore me\n").unwrap();
+
+    p.adocs_from_parent().arg("init").assert().success();
+    fs::write(
+        p.path().join(".adocs").join(".agentwatch"),
+        "src/**/*.py\ntests/**/*.py\n",
+    )
+    .unwrap();
+
+    p.adocs_from_parent().arg("sync").assert().success();
+    p.adocs_from_parent()
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(".adocs/agents/src/app.py.md"))
+        .stdout(predicate::str::contains(
+            ".adocs/agents/src/pkg/worker.py.md",
+        ))
+        .stdout(predicate::str::contains(
+            ".adocs/agents/tests/unit/test_app.py.md",
+        ))
+        .stdout(predicate::str::contains("notes.txt").not())
         .stdout(predicate::str::contains(".adocs/agents/src/main.rs.md").not());
 }
 

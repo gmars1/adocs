@@ -21,14 +21,16 @@ pub fn discover_source_files(
     map_root: &Utf8PathBuf,
     respect_gitignore: bool,
 ) -> Result<Vec<ObservedFile>, crate::error::AdocsError> {
-    let matcher = agenignore::build_ignore_matcher(map_root)?;
-    let watch = agentwatch::build_watch_matcher(source_root, map_root)?;
-
     let source_abs = source_root.as_std_path().canonicalize().map_err(|e| {
         crate::error::AdocsError::SourceRootMissing(format!("{}: {}", source_root, e))
     })?;
+    let source_abs = Utf8PathBuf::from_path_buf(source_abs)
+        .map_err(|_| crate::error::AdocsError::InvalidUtf8Path)?;
 
-    let mut builder = WalkBuilder::new(&source_abs);
+    let matcher = agenignore::build_ignore_matcher(map_root)?;
+    let watch = agentwatch::build_watch_matcher(&source_abs, map_root)?;
+
+    let mut builder = WalkBuilder::new(source_abs.as_std_path());
     builder.standard_filters(respect_gitignore);
     builder.hidden(false);
     builder.ignore(false);
@@ -47,7 +49,7 @@ pub fn discover_source_files(
                 return false;
             }
             if let Some(ref w) = watch {
-                if w.matched(entry.path(), is_dir).is_ignore() {
+                if !is_dir && w.matched(entry.path(), false).is_ignore() {
                     return false;
                 }
             }
@@ -67,7 +69,7 @@ pub fn discover_source_files(
             let is_dir = entry
                 .file_type()
                 .map_or(false, |ft: std::fs::FileType| ft.is_dir());
-            if w.matched(entry.path(), is_dir).is_ignore() {
+            if !is_dir && w.matched(entry.path(), false).is_ignore() {
                 return false;
             }
             if let Some(name) = entry
