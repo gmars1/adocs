@@ -98,6 +98,9 @@ pub fn run_sync(request: &crate::SyncRequest) -> Result<SyncReport, crate::error
                 std::fs::remove_file(&desc_abs)?;
                 docs_deleted += 1;
             }
+            if let Some(file_id) = ledger.observed_path_index.remove(prev_path) {
+                ledger.files.remove(&file_id);
+            }
         } else if candidates.len() == 1 {
             let new_path = &candidates[0].source_path;
             let old_desc = record.description_path.clone();
