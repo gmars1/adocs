@@ -68,7 +68,7 @@ adocs sync
 # See what changed in source since last observation
 adocs changed
 
-# Full picture: changes + doc freshness + ambiguous moves
+# Action list: source changes + docs that need attention
 adocs status
 
 # After editing a file_description.md to match new code, accept it
@@ -90,7 +90,7 @@ adocs stale
 | `adocs init` | Create `.adocs/` in the project root |
 | `adocs sync` | Materialize missing templates, move docs for same-hash renames, delete orphans |
 | `adocs changed [--json]` | Read-only: added, modified, deleted, moved, renamed, ambiguous |
-| `adocs status [--json]` | Full read-only report: changes + doc states + missing docs + ambiguity |
+| `adocs status [--json]` | Read-only action list: source changes, docs to update/create, ambiguity, and summary counts. Use `--json` for the full inventory |
 | `adocs list --state <stale\|valid\|sealed\|all>` | Filter by state; add `--kind files` or `--kind folders` |
 | `adocs stale` | Shorthand for `list --state stale` |
 | `adocs valid` | Shorthand for `list --state valid` |
