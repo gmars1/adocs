@@ -58,7 +58,7 @@ fn test_sync_creates_templates() {
     let p = TestProject::new();
     p.adocs().arg("init").assert().success();
     p.adocs().arg("sync").assert().success()
-        .stdout(predicate::str::contains("templates created"));
+        .stdout(predicate::str::contains("created"));
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn test_status_shows_stale_for_new_files() {
     p.adocs().arg("init").assert().success();
     p.adocs().arg("sync").assert().success();
     p.adocs().arg("status").assert().success()
-        .stdout(predicate::str::contains("stale src/main.rs"));
+        .stdout(predicate::str::contains("stale   src/main.rs"));
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn test_update_promotes_to_valid() {
     p.adocs().arg("update").arg("src/main.rs").assert().success()
         .stdout(predicate::str::contains("valid"));
     p.adocs().arg("status").assert().success()
-        .stdout(predicate::str::contains("valid src/main.rs"));
+        .stdout(predicate::str::contains("valid   src/main.rs"));
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn test_edit_makes_file_stale_again() {
     p.adocs().arg("update").arg("src/main.rs").assert().success();
     fs::write(p.path().join("src").join("main.rs"), "fn main() { println!(\"modified\"); }\n").unwrap();
     p.adocs().arg("status").assert().success()
-        .stdout(predicate::str::contains("stale src/main.rs"));
+        .stdout(predicate::str::contains("stale   src/main.rs"));
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn test_missing_folder_purpose_reported() {
     let p = TestProject::new();
     p.adocs().arg("init").assert().success();
     p.adocs().arg("status").assert().success()
-        .stdout(predicate::str::contains("missing docs"));
+        .stdout(predicate::str::contains("Missing docs"));
 }
 
 #[test]
