@@ -37,15 +37,42 @@ pub fn build_watch_matcher(
     let mut builder = GitignoreBuilder::new(source_root.as_std_path());
     builder.add_line(None, "*")?;
 
+    let mut added_pattern = false;
     for pattern in &patterns {
-        let pattern = pattern.trim_end_matches('/');
-        if pattern.is_empty() {
+        let Some(translated) = translate_pattern(pattern) else {
             continue;
-        }
-        builder.add_line(None, &format!("!{}", pattern))?;
-        builder.add_line(None, &format!("!{}/**", pattern))?;
+        };
+        builder.add_line(None, &format!("!{}", translated))?;
+        added_pattern = true;
+    }
+
+    if !added_pattern {
+        return Ok(None);
     }
 
     let gitignore = builder.build().map_err(crate::error::AdocsError::from)?;
     Ok(Some(gitignore))
+}
+
+fn translate_pattern(pattern: &str) -> Option<String> {
+    let pattern = pattern.trim();
+    if pattern.is_empty() || pattern.starts_with('#') || pattern == "." {
+        return None;
+    }
+
+    let is_dir = pattern.ends_with('/');
+    let body = pattern.trim_end_matches('/');
+    if body.is_empty() {
+        return None;
+    }
+
+    let translated = if is_dir {
+        format!("{}/**", body)
+    } else if !body.contains('/') && !body.starts_with("**") {
+        format!("/{}", body)
+    } else {
+        body.to_string()
+    };
+
+    Some(translated)
 }
