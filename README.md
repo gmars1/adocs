@@ -102,9 +102,7 @@ adocs stale
 | `adocs serve --mcp` | Start the MCP server |
 | `adocs install-agent <agent>` | Print MCP config for opencode, cursor, claude-code, or codex |
 
-Global flags: `--source-root`, `--map-root`, `--config`. Or set
-`ADOCS_SOURCE_ROOT` / `ADOCS_MAP_ROOT`, or drop an `adocs.toml` in your
-project.
+Global flags: `--source-root`, `--map-root`, `--config`.
 
 ---
 
@@ -173,28 +171,6 @@ map_root = "adocs"
 └── .hashes/
     └── files.json          # content hashes and doc linkage
 ```
-
----
-
-## CI/automation
-
-```bash
-# Fail if any stale docs or missing descriptions
-adocs status --fail-on-stale --fail-on-missing-docs
-
-# Fail if ambiguous file identities exist
-adocs status --fail-on-ambiguous
-```
-
----
-
-## What adocs is not
-
-- A test runner
-- A code coverage tool
-- A bot that automatically trusts docs after observing files
-
-It's a map. It tells agents which docs are fresh and which need work.
 
 ---
 
