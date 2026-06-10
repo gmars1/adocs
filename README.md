@@ -45,14 +45,10 @@ refreshen it.
 
 ## Install
 
-```bash
-cargo install adocs
-```
-
-Or build from source:
+Build from source:
 
 ```bash
-git clone https://github.com/adocs/adocs.git
+git clone https://github.com/gmars1/adocs
 cd adocs
 cargo build --release
 ```
