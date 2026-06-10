@@ -1,5 +1,5 @@
 use camino::Utf8PathBuf;
-use ignore::gitignore::Gitignore;
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
 
 pub const DEFAULT_WATCH_PATTERNS: &[&str] = &["."];
 
@@ -14,6 +14,7 @@ pub fn write_default_agentwatch(map_root: &Utf8PathBuf) -> Result<(), crate::err
 }
 
 pub fn build_watch_matcher(
+    source_root: &Utf8PathBuf,
     map_root: &Utf8PathBuf,
 ) -> Result<Option<Gitignore>, crate::error::AdocsError> {
     let watch_file = map_root.join(".adocs").join(".agentwatch");
@@ -29,34 +30,22 @@ pub fn build_watch_matcher(
         .filter(|l| !l.is_empty() && !l.starts_with('#'))
         .collect();
 
-    if patterns.is_empty() {
+    if patterns.is_empty() || patterns.iter().any(|p| p == ".") {
         return Ok(None);
     }
 
-    if patterns.len() == 1 && patterns[0] == "." {
-        return Ok(None);
-    }
+    let mut builder = GitignoreBuilder::new(source_root.as_std_path());
+    builder.add_line(None, "*")?;
 
-    let mut gitignore_content = String::from("*\n");
     for pattern in &patterns {
-        gitignore_content.push('!');
-        gitignore_content.push_str(pattern);
-        gitignore_content.push('\n');
+        let pattern = pattern.trim_end_matches('/');
+        if pattern.is_empty() {
+            continue;
+        }
+        builder.add_line(None, &format!("!{}", pattern))?;
+        builder.add_line(None, &format!("!{}/**", pattern))?;
     }
 
-    let synthetic_path = map_root
-        .join(".adocs")
-        .join(".hashes")
-        .join(".watch_gitignore");
-    if let Some(parent) = synthetic_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(synthetic_path.as_std_path(), &gitignore_content)?;
-
-    let (gitignore, err) = Gitignore::new(synthetic_path.as_std_path());
-    if let Some(err) = err {
-        eprintln!("Warning: error reading .agentwatch patterns: {}", err);
-    }
-
+    let gitignore = builder.build().map_err(crate::error::AdocsError::from)?;
     Ok(Some(gitignore))
 }
