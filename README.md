@@ -83,6 +83,12 @@ adocs stale
 
 ---
 
+## Configuration
+
+`adocs.toml`, `.adocs/.agentwatch`, and `.adocs/.agenignore` are documented in [configuration.md](configuration.md).
+
+---
+
 ## CLI
 
 | Command | |
