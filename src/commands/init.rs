@@ -222,6 +222,30 @@ pub fn run_sync(request: &crate::SyncRequest) -> Result<SyncReport, crate::error
             .filter_map(|obs| obs.source_path.parent().map(|p| p.to_owned()))
             .collect();
 
+        for folder_path in &active_folders {
+            let purpose_path = crate::model::paths::folder_purpose_path(folder_path.as_str());
+            let purpose_abs = request.roots.map_root.join(&purpose_path);
+            if !purpose_abs.exists() {
+                if let Some(parent) = purpose_abs.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                std::fs::write(
+                    &purpose_abs,
+                    format!("# {}\n\nTODO: describe why this folder exists\n", folder_path),
+                )?;
+                templates_created += 1;
+
+                prev_folders.folders.entry(folder_path.clone()).or_insert_with(|| {
+                    crate::model::FolderRecord {
+                        purpose_path: purpose_path.clone(),
+                        doc_sha256: None,
+                        doc: None,
+                        seal: None,
+                    }
+                });
+            }
+        }
+
         let orphaned: Vec<Utf8PathBuf> = prev_folders
             .folders
             .keys()
