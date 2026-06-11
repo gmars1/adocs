@@ -2,7 +2,21 @@
 name = "adocs"
 version = "0.1.0"
 edition = "2021"
-description = "Local-first trust map for code repositories"
+description = "Agent docs (adocs) - Navigation map for codebases"
+license = "MIT"
+repository = "https://github.com/gmars1/adocs"
+homepage = "https://github.com/gmars1/adocs"
+readme = "README.md"
+keywords = ["agents", "mcp", "docs", "cli"]
+include = [
+    "Cargo.toml",
+    "Cargo.lock",
+    "LICENSE",
+    "README.md",
+    "configuration.md",
+    "src/**",
+    "tests/**",
+]
 
 [[bin]]
 name = "adocs"
