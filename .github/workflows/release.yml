@@ -57,12 +57,16 @@ jobs:
           cp target/package/adocs-*.crate dist/
           cd dist
           sha256sum *.tar.gz *.crate > SHA256SUMS
+          ls -lh *.tar.gz *.crate SHA256SUMS
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" dist/* \
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/*.tar.gz \
+            dist/*.crate \
+            dist/SHA256SUMS \
             --verify-tag \
             --title "${GITHUB_REF_NAME}" \
             --generate-notes
