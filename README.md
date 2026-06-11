@@ -45,6 +45,12 @@ refreshen it.
 
 ## Install
 
+Install from cargo:
+
+```bash
+cargo install adocs
+```
+
 Build from source:
 
 ```bash
