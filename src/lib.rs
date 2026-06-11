@@ -161,6 +161,7 @@ pub struct FileStatusJson {
     pub path: String,
     pub state: String,
     pub content_sha256: String,
+    pub description_doc_exists: bool,
     pub doc_current: bool,
     pub sealed_current: bool,
     pub change: Option<String>,

@@ -189,6 +189,37 @@ fn test_status_shows_stale_for_new_files() {
 }
 
 #[test]
+fn test_status_splits_file_docs_to_update_and_create() {
+    let p = TestProject::new();
+    p.adocs().arg("init").assert().success();
+    p.adocs().arg("sync").assert().success();
+    p.adocs()
+        .arg("update")
+        .arg("src/main.rs")
+        .assert()
+        .success();
+
+    fs::write(
+        p.path().join("src").join("main.rs"),
+        "fn main() { println!(\"changed\"); }\n",
+    )
+    .unwrap();
+    fs::write(p.path().join("src").join("new.rs"), "pub fn new() {}\n").unwrap();
+
+    let assert = p.adocs().arg("status").assert().success();
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+
+    let update_heading = stdout.find("File docs to update").unwrap();
+    let create_heading = stdout.find("File docs to create").unwrap();
+    let main_doc = stdout.find(".adocs/agents/src/main.rs.md").unwrap();
+    let new_doc = stdout.find(".adocs/agents/src/new.rs.md").unwrap();
+
+    assert!(main_doc > update_heading);
+    assert!(main_doc < create_heading);
+    assert!(new_doc > create_heading);
+}
+
+#[test]
 fn test_update_promotes_to_valid() {
     let p = TestProject::new();
     p.adocs().arg("init").assert().success();
@@ -204,7 +235,7 @@ fn test_update_promotes_to_valid() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "2 files (1 current, 1 need update)",
+            "2 files (1 current, 1 need update, 0 missing)",
         ))
         .stdout(predicate::str::contains("src/main.rs").not());
 }
