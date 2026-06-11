@@ -137,9 +137,9 @@ Tools exposed over stdio:
 | `adocs_read_context` | Description + purpose + state + seal metadata for a path |
 | `adocs_read_file_description` | Read one file description with its state |
 | `adocs_read_folder_purpose` | Read one folder purpose with its state |
-| `adocs_read_folder_docs` | All valid docs under a folder |
+| `adocs_read_folder_docs` | All valid docs under a folder; can be large |
 | `adocs_explain_staleness` | Why is this path stale? |
-| `adocs_update_doc` | Accept current doc for current hash (agents can use this) |
+| `adocs_update_doc` | Accept a doc |
 | `adocs_request_seal` | Ask a human to seal a path (agents cannot seal) |
 
 Agents should call `adocs_status` on entry, then `adocs_read_context` before
