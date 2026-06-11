@@ -248,6 +248,7 @@ fn compute_file_status(
             path: obs.source_path.to_string(),
             state: state.to_string(),
             content_sha256: obs.content_sha256.clone(),
+            description_doc_exists: description_exists,
             doc_current: record
                 .and_then(|r| r.doc.as_ref())
                 .map(|d| d.accepted_source_sha256 == obs.content_sha256)
