@@ -40,7 +40,16 @@ fn red(s: &str) -> String {
 }
 
 pub fn print_status(report: &StatusReport) {
-    let stale_files: Vec<_> = report.files.iter().filter(|f| f.state == "stale").collect();
+    let file_docs_to_update: Vec<_> = report
+        .files
+        .iter()
+        .filter(|f| f.state == "stale" && f.description_doc_exists)
+        .collect();
+    let missing_descriptions: Vec<_> = report
+        .files
+        .iter()
+        .filter(|f| !f.description_doc_exists)
+        .collect();
     let current_files = report
         .files
         .iter()
@@ -84,13 +93,28 @@ pub fn print_status(report: &StatusReport) {
         println!();
     }
 
-    if !stale_files.is_empty() {
+    if !file_docs_to_update.is_empty() {
         println!(
             "  {} ({})",
             yellow("File docs to update"),
-            stale_files.len()
+            file_docs_to_update.len()
         );
-        for file in &stale_files {
+        for file in &file_docs_to_update {
+            println!(
+                "  {}",
+                crate::model::paths::file_description_path(&file.path)
+            );
+        }
+        println!();
+    }
+
+    if !missing_descriptions.is_empty() {
+        println!(
+            "  {} ({})",
+            yellow("File docs to create"),
+            missing_descriptions.len()
+        );
+        for file in &missing_descriptions {
             println!(
                 "  {}",
                 crate::model::paths::file_description_path(&file.path)
@@ -139,10 +163,11 @@ pub fn print_status(report: &StatusReport) {
 
     let mut parts = Vec::new();
     parts.push(format!(
-        "{} files ({} current, {} need update)",
+        "{} files ({} current, {} need update, {} missing)",
         report.files.len(),
         current_files,
-        stale_files.len(),
+        file_docs_to_update.len(),
+        missing_descriptions.len(),
     ));
     parts.push(format!(
         "{} folders ({} current, {} need update, {} missing)",
