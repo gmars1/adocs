@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: github-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Check release ref
+        run: |
+          case "${GITHUB_REF}" in
+            refs/tags/v*) ;;
+            *)
+              echo "Releases must run from version tags like v0.1.0."
+              exit 1
+              ;;
+          esac
+
+      - name: Test
+        run: cargo test --all-targets --all-features --locked
+
+      - name: Build release binaries
+        run: cargo build --release --bins --locked
+
+      - name: Package crate
+        run: cargo package --locked
+
+      - name: Build release assets
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          target="x86_64-unknown-linux-gnu"
+          mkdir -p dist "dist/adocs-${tag}-${target}"
+          cp target/release/adocs "dist/adocs-${tag}-${target}/"
+          cp target/release/adocs-mcp "dist/adocs-${tag}-${target}/"
+          cp README.md LICENSE "dist/adocs-${tag}-${target}/"
+          tar -C dist -czf "dist/adocs-${tag}-${target}.tar.gz" "adocs-${tag}-${target}"
+          cp target/package/adocs-*.crate dist/
+          cd dist
+          sha256sum *.tar.gz *.crate > SHA256SUMS
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --verify-tag \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes

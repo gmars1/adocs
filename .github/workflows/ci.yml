@@ -48,3 +48,6 @@ jobs:
 
       - name: Build binaries
         run: cargo build --bins --locked
+
+      - name: Package crate
+        run: cargo package --locked
