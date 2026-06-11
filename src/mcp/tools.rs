@@ -76,9 +76,9 @@ impl AdocsMcpServer {
         rt!("adocs_read_file_description", "Read one file_description.md for a source path with its trust state", ReadContextParams);
         rt!("adocs_read_folder_purpose", "Read one folder_purpose.md for a source folder with its trust state", ReadContextParams);
         rt!("adocs_explain_staleness", "Explain why a path is stale: missing doc, source hash changed, doc hash changed, ambiguity, etc.", ExplainStalenessParams);
-        rt!("adocs_update_doc", "Accept current file_description.md for the current source content hash (stale -> valid)", UpdateDocParams);
+        rt!("adocs_update_doc", "Accept a file_description.md only after you have updated it to match the current source content (stale -> valid)", UpdateDocParams);
         rt!("adocs_request_seal", "Request human seal review for a valid path. Agents must not seal directly.", RequestSealParams);
-        rt!("adocs_read_folder_docs", "Get all valid docs (file descriptions + folder purposes) under a folder. Use folders_only or files_only to filter.", ReadFolderDocsParams);
+        rt!("adocs_read_folder_docs", "Get every valid doc under a folder. Use this when you need the full set and can handle a larger response; prefer the smallest folder that answers the question. Use folders_only or files_only to filter.", ReadFolderDocsParams);
         Self { roots, tools }
     }
 
@@ -213,7 +213,7 @@ impl ServerHandler for AdocsMcpServer {
                 icons: None,
                 website_url: None,
             },
-            instructions: Some("Use adocs_* tools before broad filesystem exploration. Check adocs_status first for workspace health, then use adocs_read_context for specific paths.".into()),
+            instructions: Some("Use adocs_* tools before broad filesystem exploration. Check adocs_status first for workspace health, then use adocs_read_context for specific paths. Use adocs_read_folder_docs only when you need all docs for a folder and can handle a larger response. Use adocs_update_doc only after the file description has been updated to match current source.".into()),
         }
     }
 
